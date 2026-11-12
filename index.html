@@ -443,7 +443,7 @@ getDoc(doc(db,'settings','storefront')).then(snap=>{if(snap.exists())applySiteSe
 async function seedProductsIfEmpty(){
  const snap=await getDocs(collection(db,'products'));
  if(snap.empty && isAdmin()){
-  for(const p of initialProducts){const {id,...data}=p;await setDoc(doc(db,'products',id),data);}
+  for(const p of initialProducts){const {id,...data}=p;data.specs=Array.isArray(data.specs)?data.specs.map(row=>Array.isArray(row)?{label:String(row[0]??''),value:String(row[1]??'')}:row):[];await setDoc(doc(db,'products',id),data);}
  }else if(isAdmin()){
   const denver=snap.docs.find(d=>d.id==='denver');
   if(denver && denver.data().name==='Denver Nano Travel Size Deo Pack'){
@@ -456,7 +456,7 @@ async function refreshPublicProducts(){
   const snap=await getDocs(collection(db,'products'));
   if(snap.empty)return;
   const old=window.PRODUCTS;
-  for(const d of snap.docs){const data=d.data();if(data.active===false)continue;const previous=old[d.id]||{};old[d.id]={...previous,...data,id:d.id,images:data.imageURL?[data.imageURL]:(Array.isArray(data.images)?data.images:(previous.images||[])),specs:Array.isArray(data.specs)?data.specs:(previous.specs||[])};}
+  for(const d of snap.docs){const data=d.data();if(data.active===false)continue;const previous=old[d.id]||{};old[d.id]={...previous,...data,id:d.id,images:data.imageURL?[data.imageURL]:(Array.isArray(data.images)?data.images:(previous.images||[])),specs:Array.isArray(data.specs)?data.specs.map(row=>Array.isArray(row)?row:[row?.label??'',row?.value??'']):(previous.specs||[])};}
   for(const id of Object.keys(old)){if(!snap.docs.some(d=>d.id===id)||snap.docs.find(d=>d.id===id)?.data().active===false)delete old[id];}
   renderHomeProductCards();
  }catch(e){console.warn('Could not load products from Firestore',e);}
@@ -472,7 +472,7 @@ window.cocoLoadProducts=async()=>{
  try{await seedProductsIfEmpty();const snap=await getDocs(collection(db,'products'));$('adminProducts').innerHTML=snap.empty?'<p class="muted">No products yet.</p>':snap.docs.map(d=>{const x=d.data();return `<div class="admin-product"><div><strong>${escapeHtml(x.name||d.id)}</strong><small>₹${Number(x.price||0)} · ${x.active===false?'Hidden':'Visible'} · ${x.stock===null||x.stock===undefined?'Stock untracked':'Stock '+Number(x.stock)}</small></div><button onclick="cocoEditProduct('${d.id}')">Edit</button><button onclick="cocoDeleteProduct('${d.id}')">Delete</button></div>`;}).join('');await refreshPublicProducts();}catch(e){$('adminProducts').innerHTML='<p class="muted">Could not load products: '+escapeHtml(e.message)+'</p>';}
 };
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-window.cocoEditProduct=async id=>{if(!isAdmin())return;const snap=await getDocs(collection(db,'products'));const d=snap.docs.find(x=>x.id===id);if(!d)return;const x=d.data();currentEditId=id;$('productFormTitle').textContent='Edit product';$('adminProductId').value=id;$('adminProductId').disabled=true;$('adminProductName').value=x.name||'';$('adminProductPrice').value=x.price??'';$('adminProductMrp').value=x.mrp??'';$('adminProductDelivery').value=x.delivery??0;$('adminProductStock').value=x.stock??'';$('adminProductImage').value=x.imageURL||'';currentEditImageURL=x.imageURL||'';$('adminProductSpecs').value=Array.isArray(x.specs)?x.specs.map(row=>Array.isArray(row)?row.join(': '):String(row)).join('\n'):'';$('adminProductBadge').value=x.badge||'';resetSelectedProductImage();window.scrollTo({top:$('productFormTitle').getBoundingClientRect().top+window.scrollY-90,behavior:'smooth'});};
+window.cocoEditProduct=async id=>{if(!isAdmin())return;const snap=await getDocs(collection(db,'products'));const d=snap.docs.find(x=>x.id===id);if(!d)return;const x=d.data();currentEditId=id;$('productFormTitle').textContent='Edit product';$('adminProductId').value=id;$('adminProductId').disabled=true;$('adminProductName').value=x.name||'';$('adminProductPrice').value=x.price??'';$('adminProductMrp').value=x.mrp??'';$('adminProductDelivery').value=x.delivery??0;$('adminProductStock').value=x.stock??'';$('adminProductImage').value=x.imageURL||'';currentEditImageURL=x.imageURL||'';$('adminProductSpecs').value=Array.isArray(x.specs)?x.specs.map(row=>Array.isArray(row)?row.join(': '):(row&&typeof row==='object'?[row.label||'',row.value||''].join(': '):String(row))).join('\n'):'';$('adminProductBadge').value=x.badge||'';resetSelectedProductImage();window.scrollTo({top:$('productFormTitle').getBoundingClientRect().top+window.scrollY-90,behavior:'smooth'});};
 window.cocoResetProductForm=()=>{currentEditId=null;currentEditImageURL='';$('productFormTitle').textContent='Add a product';$('adminProductId').disabled=false;['adminProductId','adminProductName','adminProductPrice','adminProductMrp','adminProductDelivery','adminProductStock','adminProductImage','adminProductSpecs','adminProductBadge'].forEach(id=>$(id).value='');resetSelectedProductImage();};
 window.cocoSaveProduct=async()=>{
  if(!isAdmin()){toast('Admin access required.');return;}
@@ -483,7 +483,8 @@ window.cocoSaveProduct=async()=>{
  const saveButton=document.querySelector('#adminPanel button[onclick="cocoSaveProduct()"]');if(saveButton){saveButton.disabled=true;saveButton.textContent='Saving product…';}
  try{
   if(selectedProductImageFile)imageURL=await uploadProductImage(selectedProductImageFile,id);
-  const productData={name,price,mrp,delivery,stock,specs,imageURL,badge,active:true,updatedAt:serverTimestamp()};
+  const firestoreSpecs=specs.map(row=>({label:String(row[0]??''),value:String(row[1]??'')}));
+  const productData={name,price,mrp,delivery,stock,specs:firestoreSpecs,imageURL,badge,active:true,updatedAt:serverTimestamp()};
   await setDoc(doc(db,'products',id),productData,{merge:true});
   toast('Product saved.');cocoResetProductForm();await cocoLoadProducts();
  }catch(e){console.error('COCO product save failed',e);setProductImageStatus('Save failed: '+(e.message||'Unknown error'),true);toast('Could not save product: '+e.message);}
