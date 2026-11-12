@@ -65,6 +65,17 @@
 .policy-link{color:#5e2b79}
 @media(max-width:420px){.track-steps span{font-size:8px;padding:7px 2px}}
 
+
+.avatar-photo{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid #e7d8ef;background:#f1e8f5;flex:0 0 44px}
+.account-identity{min-width:0;flex:1}.account-identity b,.account-identity small{overflow-wrap:anywhere}
+.profile-detail{display:flex;gap:14px;align-items:center}.profile-large{width:64px;height:64px;object-fit:cover;border-radius:50%;background:#f2e8f7}
+.product-card .price-line{display:flex!important;align-items:baseline!important;gap:8px!important;flex-wrap:wrap!important;overflow:visible!important}
+.product-card .price-line del{display:inline!important;visibility:visible!important;opacity:1!important;color:#8d8491!important;font-size:14px!important}
+.product-card .price-line strong{display:inline!important;visibility:visible!important;opacity:1!important;color:#211a27!important;font-size:23px!important}
+.product-card .save-tag{display:inline-block!important;visibility:visible!important}
+.product-card .delivery-note{display:block!important;visibility:visible!important;color:#655c69!important}
+#savedAddressList{margin:0 0 12px}
+@media(max-width:420px){.card-image{height:205px}.card-copy{padding:12px}.product-card .price-line strong{font-size:21px!important}}
 </style>
 </head>
 <body>
@@ -127,7 +138,7 @@
   </section>
   <section class="page" id="cart"><h1>My Cart</h1><p class="sub">Your COCO shopping bag.</p><div id="cartContent"><div class="empty"><div class="heart">♡</div><h2>Your cart is empty</h2><p>Add something lovely from COCO to get started.</p><button class="btn primary" onclick="go('home')">Continue shopping</button></div></div></section>
   <section class="page" id="checkout"><button class="back-link" onclick="go('cart')">‹ Back to cart</button><h1>Checkout</h1><p class="sub">Almost yours. Just a few details.</p><div class="checkout-card" id="customerCheckoutGate"><h3>Sign in to continue</h3><p class="muted">Use your Google account to place and manage your COCO orders.</p><button class="btn primary full" onclick="cocoCustomerLogin()">Continue with Google</button></div><div id="checkoutProtected" hidden><div class="checkout-card"><h3>Delivery address</h3><input id="buyerName" placeholder="Full name"><input id="buyerPhone" inputmode="tel" placeholder="Mobile number"><input id="buyerPin" inputmode="numeric" maxlength="6" placeholder="PIN code"><textarea id="buyerAddress" placeholder="House / flat, street, area"></textarea><input id="buyerCity" placeholder="City, State"></div><div class="checkout-card"><h3>Payment method</h3><label class="payment-option"><input type="radio" name="payment" value="cod" checked><span><b>Cash on Delivery</b><small>Pay when your order arrives</small></span><strong class="available">Available</strong></label><label class="payment-option disabled"><input type="radio" name="payment" value="upi" disabled><span><b>UPI Payment</b><small>Online payment option</small></span><strong class="soon">Coming Soon</strong></label></div><div class="checkout-card" id="checkoutSummary"></div><button class="btn primary full" onclick="placeOrder()">Place order · Cash on Delivery</button><p class="fine-print">Your order will be placed with Cash on Delivery.</p></div></section>
-  <section class="page" id="address"><button class="back-link" onclick="go('home')">‹ Back</button><h1>Deliver to</h1><p class="sub">Add the address where you'd like your COCO order delivered.</p><div class="checkout-card"><button class="btn outline full" onclick="toast('Location detection is not connected yet. Enter your address below.')">⌖ Use current location</button><input id="addrName" placeholder="Name"><input id="addrPhone" inputmode="tel" placeholder="Mobile number"><input id="addrPin" inputmode="numeric" maxlength="6" placeholder="PIN code"><textarea id="addrLine" placeholder="House / flat, street, area"></textarea><input id="addrCity" placeholder="City, State"><button class="btn primary full" onclick="saveAddress()">Save address</button></div></section>
+  <section class="page" id="address"><button class="back-link" onclick="go('home')">‹ Back</button><h1>Deliver to</h1><p class="sub">Add the address where you'd like your COCO order delivered.</p><div id="savedAddressList"></div><div class="checkout-card"><button class="btn outline full" onclick="toast('Location detection is not connected yet. Enter your address below.')">⌖ Use current location</button><input id="addrName" placeholder="Name"><input id="addrPhone" inputmode="tel" placeholder="Mobile number"><input id="addrPin" inputmode="numeric" maxlength="6" placeholder="PIN code"><textarea id="addrLine" placeholder="House / flat, street, area"></textarea><input id="addrCity" placeholder="City, State"><button class="btn primary full" onclick="saveAddress()">Save address</button></div></section>
   <section class="page" id="policies">
  <button class="back-link" onclick="go('account')">‹ Back to account</button>
  <h1>Help &amp; Store Policies</h1>
@@ -217,8 +228,8 @@ renderWishlist();updateWishButtons();
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD8xcoCmwJmgaLp2tmWEltIfhK6SkFKvN4",
@@ -251,23 +262,109 @@ window.denverLaunchApplied = window.denverLaunchApplied === true;
 function isAdmin(){return !!adminUser && (adminUser.email||'').toLowerCase()===ADMIN_EMAIL.toLowerCase() && adminUser.emailVerified===true;}
 function setAuthMessage(msg){const el=$("adminAuthMessage");if(el)el.textContent=msg;}
 function showAdminState(){const ok=isAdmin();$("adminAuth").hidden=ok;$("adminPanel").hidden=!ok;if(ok){$("adminEmail").textContent=adminUser.email;cocoLoadProducts();cocoLoadOrders();}else if(adminUser){setAuthMessage('This Google account is signed in, but it is not authorised to manage COCO.');}}
-function showCustomerState(){const state=$("customerAccountState");if(state){state.innerHTML=customerUser?`<div class="avatar">${escapeHtml((customerUser.displayName||customerUser.email||'C').charAt(0).toUpperCase())}</div><div><b>${escapeHtml(customerUser.displayName||'Welcome to COCO')}</b><small>${escapeHtml(customerUser.email||'Signed in')}</small></div><button class="sign" onclick="cocoCustomerLogout()">Sign out</button>`:`<div class="avatar">C</div><div><b>Welcome to COCO</b><small>Sign in to manage your account and orders</small></div><button class="sign" onclick="cocoCustomerLogin()">Sign in</button>`;}
- const gate=$("customerCheckoutGate"),protectedArea=$("checkoutProtected");if(gate&&protectedArea){gate.hidden=!!customerUser;protectedArea.hidden=!customerUser;}}
-async function startGoogleSignIn(messageTarget){try{await setPersistence(auth,browserLocalPersistence);if(messageTarget)setAuthMessage('Opening Google sign-in…');await signInWithRedirect(auth,provider);}catch(e){if(messageTarget)setAuthMessage('Sign-in failed: '+e.message);else toast('Google sign-in failed: '+e.message);}}
+function showCustomerState(){
+ const state=$("customerAccountState");
+ if(state)state.innerHTML=customerUser
+  ? `<img class="avatar-photo" src="${escapeHtml(customerUser.photoURL||'')}" alt="Google profile" onerror="this.style.display='none'"><div class="account-identity"><b>${escapeHtml(customerUser.displayName||'COCO Customer')}</b><small>${escapeHtml(customerUser.email||'Signed in')}</small></div><button class="sign" onclick="cocoCustomerLogout()">Logout</button>`
+  : `<div class="avatar">C</div><div class="account-identity"><b>Welcome to COCO</b><small>Sign in to manage your account and orders</small></div><button class="sign" onclick="cocoCustomerLogin()">Sign in</button>`;
+ const headerProfile=document.querySelector(".top .profile");
+ if(headerProfile)headerProfile.innerHTML=customerUser&&customerUser.photoURL?`<img src="${escapeHtml(customerUser.photoURL)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(customerUser?"✓":"♙");
+ const gate=$("customerCheckoutGate"),area=$("checkoutProtected");
+ if(gate&&area){gate.hidden=!!customerUser;area.hidden=!customerUser;}
+}
+let signInInProgress=false;
+async function startGoogleSignIn(messageTarget){
+ if(signInInProgress)return;signInInProgress=true;
+ try{
+  await setPersistence(auth,browserLocalPersistence);
+  if(messageTarget)setAuthMessage('Opening Google sign-in…');
+  try{await signInWithPopup(auth,provider);}
+  catch(err){
+   if(['auth/popup-blocked','auth/popup-closed-by-browser','auth/operation-not-supported-in-this-environment','auth/web-storage-unsupported'].includes(err.code)){
+    if(messageTarget)setAuthMessage('Opening secure Google redirect sign-in…');
+    await signInWithRedirect(auth,provider);return;
+   }throw err;
+  }
+ }catch(e){const msg='Google sign-in failed ('+(e.code||'unknown')+'): '+e.message;if(messageTarget)setAuthMessage(msg);else toast(msg);}
+ finally{signInInProgress=false;}
+}
 window.cocoCustomerLogin=()=>startGoogleSignIn(false);
-window.cocoMyProfile=()=>customerUser?toast('Signed in as '+customerUser.email):window.cocoCustomerLogin();
-window.cocoMyOrders=async()=>{if(!customerUser){window.cocoCustomerLogin();return;}let panel=document.getElementById('customerOrdersPanel');if(!panel){panel=document.createElement('div');panel.id='customerOrdersPanel';panel.className='checkout-card';document.querySelector('#account .account-box').appendChild(panel);}panel.innerHTML='<h3>My Orders & Tracking</h3><p class="muted">Loading your orders…</p>';try{const q=query(collection(db,'orders'),where('userId','==',customerUser.uid));const snap=await getDocs(q);panel.innerHTML='<h3>My Orders & Tracking</h3>'+(snap.empty?'<p class="muted">You have not placed an order yet.</p>':[...snap.docs].sort((a,b)=>(b.data().createdAt?.toMillis?.()||0)-(a.data().createdAt?.toMillis?.()||0)).map(d=>{const x=d.data();const steps=['Verifying by Admin','Order Verified','Dispatched','Delivered'];const status=x.status||'Verifying by Admin';return `<div class="customer-order"><b>Order ${escapeHtml(d.id)}</b><p>${(x.items||[]).map(i=>escapeHtml(i.name)+' × '+i.quantity).join(', ')}</p><p><b>₹${Number(x.total||0)}</b> · ${escapeHtml(status)}</p><div class="track-steps">${steps.map(st=>`<span class="${(status!=='Cancelled' && steps.indexOf(status)>=steps.indexOf(st))?'done':''}">${st}</span>`).join('')}</div>${status==='Cancelled'?'<p>Order cancelled by store.</p>':''}</div>`;}).join(''));}catch(e){panel.innerHTML='<h3>My Orders & Tracking</h3><p class="muted">Could not load orders: '+escapeHtml(e.message)+'</p>';}};
+window.cocoMyProfile=()=>{
+ if(!customerUser){window.cocoCustomerLogin();return;}
+ let panel=$('customerProfilePanel');
+ if(!panel){panel=document.createElement('div');panel.id='customerProfilePanel';panel.className='checkout-card';document.querySelector('#account .account-box').appendChild(panel);}
+ panel.innerHTML=`<h3>My Profile</h3><div class="profile-detail"><img class="profile-large" src="${escapeHtml(customerUser.photoURL||'')}" alt="Google profile"><div><b>${escapeHtml(customerUser.displayName||'COCO Customer')}</b><p class="muted">${escapeHtml(customerUser.email||'')}</p></div></div>`;
+ panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+let customerOrdersUnsubscribe=null;
+window.cocoMyOrders=async()=>{
+ if(!customerUser){window.cocoCustomerLogin();return;}
+ let panel=document.getElementById('customerOrdersPanel');
+ if(!panel){panel=document.createElement('div');panel.id='customerOrdersPanel';panel.className='checkout-card';document.querySelector('#account .account-box').appendChild(panel);}
+ panel.innerHTML='<h3>My Orders & Tracking</h3><p class="muted">Loading your orders…</p>';
+ try{
+  if(customerOrdersUnsubscribe){customerOrdersUnsubscribe();customerOrdersUnsubscribe=null;}
+  const q=query(collection(db,'orders'),where('userId','==',customerUser.uid));
+  customerOrdersUnsubscribe=onSnapshot(q,snap=>{
+   const docs=[...snap.docs].sort((a,b)=>(b.data().createdAt?.toMillis?.()||0)-(a.data().createdAt?.toMillis?.()||0));
+   panel.innerHTML='<h3>My Orders & Tracking</h3>'+(snap.empty?'<p class="muted">You have not placed an order yet.</p>':docs.map(d=>{
+    const x=d.data(),steps=['Verifying by Admin','Order Verified','Dispatched','Delivered'],status=x.status||'Verifying by Admin';
+    return `<div class="customer-order"><b>Order ${escapeHtml(d.id)}</b><p>${(x.items||[]).map(i=>escapeHtml(i.name)+' × '+i.quantity).join(', ')}</p><p><b>₹${Number(x.total||0)}</b> · ${escapeHtml(status)}</p><div class="track-steps">${steps.map(st=>`<span class="${status!=='Cancelled'&&steps.indexOf(status)>=steps.indexOf(st)?'done':''}">${st}</span>`).join('')}</div>${status==='Cancelled'?'<p>Cancelled by COCO store.</p>':''}</div>`;
+   }).join(''));
+  },e=>{panel.innerHTML='<h3>My Orders & Tracking</h3><p class="muted">Could not load orders: '+escapeHtml(e.message)+'</p>';});
+ }catch(e){panel.innerHTML='<h3>My Orders & Tracking</h3><p class="muted">Could not load orders: '+escapeHtml(e.message)+'</p>';}
+};
 window.cocoTrackOrders=()=>window.cocoMyOrders();
-window.cocoCustomerLogout=async()=>{try{await signOut(auth);toast('You have signed out.');}catch(e){toast('Could not sign out: '+e.message);}};
+
+window.cocoLoadAddresses=async()=>{
+ if(!customerUser){toast('Sign in to view saved addresses.');return;}
+ const box=$('savedAddressList');if(!box)return;
+ box.innerHTML='<p class="muted">Loading saved addresses…</p>';
+ try{const snap=await getDocs(collection(db,'users',customerUser.uid,'addresses'));
+  box.innerHTML=snap.empty?'<p class="muted">No saved addresses yet.</p>':snap.docs.map(d=>{const a=d.data();return `<div class="checkout-card"><b>${escapeHtml(a.name||'')}</b><p class="muted">${escapeHtml(a.phone||'')} · ${escapeHtml(a.pin||'')}</p><p class="muted">${escapeHtml(a.line||'')}, ${escapeHtml(a.city||'')}</p><button class="btn outline" onclick="cocoUseAddress('${d.id}')">Use at checkout</button><button class="btn outline" onclick="cocoDeleteAddress('${d.id}')">Delete</button></div>`;}).join('');
+ }catch(e){box.innerHTML='<p class="muted">Could not load addresses: '+escapeHtml(e.message)+'</p>';}
+};
+window.cocoUseAddress=async id=>{
+ if(!customerUser)return;
+ try{const snap=await getDoc(doc(db,'users',customerUser.uid,'addresses',id));if(!snap.exists())throw new Error('Address not found.');const a=snap.data();
+  $('buyerName').value=a.name||'';$('buyerPhone').value=a.phone||'';$('buyerPin').value=a.pin||'';$('buyerAddress').value=a.line||'';$('buyerCity').value=a.city||'';
+  go('checkout');toast('Saved address selected.');
+ }catch(e){toast('Could not select address: '+e.message);}
+};
+window.cocoDeleteAddress=async id=>{
+ if(!customerUser)return;
+ try{await deleteDoc(doc(db,'users',customerUser.uid,'addresses',id));await window.cocoLoadAddresses();toast('Address deleted.');}
+ catch(e){toast('Could not delete address: '+e.message);}
+};
+window.saveAddress=async()=>{
+ const name=$('addrName').value.trim(),phone=$('addrPhone').value.trim(),pin=$('addrPin').value.trim(),line=$('addrLine').value.trim(),city=$('addrCity').value.trim();
+ if(!customerUser){toast('Sign in to save your address.');await window.cocoCustomerLogin();return;}
+ if(!name||!phone||!/^\d{6}$/.test(pin)||line.length<5||city.length<2){toast('Enter a name, valid phone, 6-digit PIN, full address and city.');return;}
+ try{await addDoc(collection(db,'users',customerUser.uid,'addresses'),{name,phone,pin,line,city,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  window.savedAddress={name,phone,pin,line,city};localStorage.setItem('cocoAddress',JSON.stringify(window.savedAddress));$('buyerName').value=name;$('buyerPhone').value=phone;$('buyerPin').value=pin;$('buyerAddress').value=line;$('buyerCity').value=city;$('locationLabel').textContent=pin;
+  toast('Address saved to your COCO account.');await window.cocoLoadAddresses();go('checkout');
+ }catch(e){toast('Could not save address: '+e.message);}
+};
+
+window.cocoCustomerLogout=async()=>{try{if(customerOrdersUnsubscribe){customerOrdersUnsubscribe();customerOrdersUnsubscribe=null;}document.getElementById('customerOrdersPanel')?.remove();document.getElementById('customerProfilePanel')?.remove();await signOut(auth);toast('You have signed out.');}catch(e){toast('Could not sign out: '+e.message);}};
 window.cocoAdminLogin=()=>startGoogleSignIn(true);
 window.cocoAdminLogout=async()=>{try{await signOut(auth);window.go('account');}catch(e){setAuthMessage('Sign-out failed: '+e.message);}};
-getRedirectResult(auth).then(result=>{if(result?.user){adminUser=result.user;customerUser=result.user;showAdminState();showCustomerState();}}).catch(e=>{setAuthMessage('Google sign-in error: '+e.message);toast('Google sign-in error: '+e.message);});
-onAuthStateChanged(auth,user=>{adminUser=user;customerUser=user;showAdminState();showCustomerState();});
+getRedirectResult(auth).catch(e=>{setAuthMessage('Google sign-in error ('+(e.code||'unknown')+'): '+e.message);toast('Google sign-in error: '+e.message);});
+onAuthStateChanged(auth,async user=>{
+ adminUser=user;customerUser=user;showAdminState();showCustomerState();
+ if(user){try{await setDoc(doc(db,'users',user.uid),{uid:user.uid,email:user.email||'',displayName:user.displayName||'',photoURL:user.photoURL||'',emailVerified:user.emailVerified===true,lastSignInAt:serverTimestamp()},{merge:true});}
+ catch(e){console.error('Profile sync failed',e);toast('Signed in, but profile sync failed: '+e.message);}}
+});
 
 async function seedProductsIfEmpty(){
  const snap=await getDocs(collection(db,'products'));
  if(snap.empty && isAdmin()){
   for(const p of initialProducts){const {id,...data}=p;await setDoc(doc(db,'products',id),data);}
+ }else if(isAdmin()){
+  const denver=snap.docs.find(d=>d.id==='denver');
+  if(denver && denver.data().name==='Denver Nano Travel Size Deo Pack'){
+   await updateDoc(doc(db,'products','denver'),{name:'Denver Nano Travel Size Deo Pack (5 × 50 ml)',updatedAt:serverTimestamp()});
+  }
  }
 }
 async function refreshPublicProducts(){
@@ -283,7 +380,7 @@ async function refreshPublicProducts(){
 window.renderHomeProductCards=function(){
  const grid=$('productGrid');if(!grid)return;
  const products=Object.values(window.PRODUCTS).filter(p=>p.active!==false);
- grid.innerHTML=products.map(p=>{const image=p.images?.[0]||'';const delivery=Number(p.delivery||0);const price=Number(p.price||0);const mrp=Number(p.mrp||0);return `<article class="product-card" data-product="${p.id}" onclick="openProduct('${p.id}')"><div class="card-image">${image?`<img src="${image}" alt="${p.name}">`:''}<span class="offer-badge">${delivery===0?'FREE DELIVERY':'COCO OFFER'}</span><button class="wish-float" aria-label="Add to wishlist" onclick="event.stopPropagation();toggleWish('${p.id}')">♡</button></div><div class="card-copy"><span class="eyebrow">COCO STORE</span><h3>${p.name}</h3><div class="price-line"><strong>₹${price}</strong>${mrp?`<del>₹${mrp}</del><span class="save-tag">Save ₹${mrp-price}</span>`:''}</div><p class="delivery-note">${delivery===0?'Free delivery':'+ ₹'+delivery+' delivery charge'}</p><div class="home-actions"><button class="btn outline" onclick="event.stopPropagation();openProduct('${p.id}')">View product <span aria-hidden="true">→</span></button></div></div></article>`;}).join('');
+ grid.innerHTML=products.map(p=>{const image=p.images?.[0]||'';const delivery=Number(p.delivery||0);const price=Number(p.price||0);const mrp=Number(p.mrp||0);return `<article class="product-card" data-product="${p.id}" onclick="openProduct('${p.id}')"><div class="card-image">${image?`<img src="${image}" alt="${p.name}">`:''}<span class="offer-badge">${delivery===0?'FREE DELIVERY':'COCO OFFER'}</span><button class="wish-float" aria-label="Add to wishlist" onclick="event.stopPropagation();toggleWish('${p.id}')">♡</button></div><div class="card-copy"><span class="eyebrow">COCO STORE</span><h3>${p.name}</h3><div class="price-line"><del>₹${mrp}</del><strong>₹${price}</strong>${mrp?`<span class="save-tag">Save ₹${mrp-price}</span>`:''}</div><p class="delivery-note">${delivery===0?'Free delivery':'+ ₹'+delivery+' delivery charge'}</p><div class="home-actions"><button class="btn outline" onclick="event.stopPropagation();openProduct('${p.id}')">View Product <span aria-hidden="true">→</span></button></div></div></article>`;}).join('');
  const count=document.querySelector('.section-head .tiny-label');if(count)count.textContent=products.length+' PRODUCTS';
 };
 window.cocoLoadProducts=async()=>{
@@ -323,7 +420,7 @@ window.placeOrder=async()=>{
  const subtotal=window.cocoCartSubtotal(),delivery=window.cocoCartDelivery(),discount=window.denverLaunchApplied?Math.min(50*Number(currentCart.denver||0),subtotal):0,total=subtotal+delivery-discount;
  const payload={userId:signedInUser.uid,customerEmail:signedInUser.email||'',customerName:$('buyerName').value.trim(),phone,pin,address:$('buyerAddress').value.trim(),city:$('buyerCity').value.trim(),items,subtotal,delivery,discount,couponCode:window.denverLaunchApplied?'DENVER-LAUNCH':'',total,paymentMethod:'COD',status:'Verifying by Admin',createdAt:serverTimestamp()};
  const button=document.querySelector('#checkout button[onclick="placeOrder()"]');if(button){button.disabled=true;button.textContent='Placing order…';}
- try{const ref=await addDoc(collection(db,'orders'),payload);const current=window.cocoGetCartItems();Object.keys(current).forEach(k=>delete current[k]);localStorage.setItem('cocoCart','{}');activeCoupon=null;window.denverLaunchApplied=false;saveSaved('cocoDenverLaunchApplied',false);const checkout=$('checkout');checkout.innerHTML=`<div class="empty"><div class="heart">✓</div><h2>Order placed successfully</h2><p>Your order ID:</p><p><b>${ref.id}</b></p><p>Order total ₹${total} · Cash on Delivery</p><p><b>Status: Verifying by Admin</b></p><p>Your order is waiting for the store owner to verify it.</p><button class="btn primary" onclick="go('account');cocoMyOrders()">Track order</button><button class="btn outline" onclick="go('home')">Continue shopping</button></div>`;}catch(e){if(button){button.disabled=false;button.textContent='Place order · Cash on Delivery';}toast('Order could not be placed. Please try again. '+e.message);}
+ try{const ref=await addDoc(collection(db,'orders'),payload);const current=window.cocoGetCartItems();Object.keys(current).forEach(k=>delete current[k]);localStorage.setItem('cocoCart','{}');activeCoupon=null;window.denverLaunchApplied=false;saveSaved('cocoDenverLaunchApplied',false);syncFloatingCart();renderCart();const checkout=$('checkout');const success=document.createElement('div');success.className='empty order-success';success.innerHTML=`<div class="heart">✓</div><h2>Order placed successfully</h2><p>Your order ID:</p><p><b>${ref.id}</b></p><p>Order total ₹${total} · Cash on Delivery</p><p><b>Status: Verifying by Admin</b></p><p>Your order is waiting for the store owner to verify it.</p><button class="btn primary" onclick="go('account');cocoMyOrders()">Track order</button><button class="btn outline" onclick="go('home')">Continue shopping</button>`;$('customerCheckoutGate').hidden=true;$('checkoutProtected').hidden=true;checkout.appendChild(success);}catch(e){if(button){button.disabled=false;button.textContent='Place order · Cash on Delivery';}toast('Order could not be placed. Please try again. '+e.message);}
 };
 
 // COCO Denver-only Launch Offer and cart flow.
@@ -379,6 +476,9 @@ window.renderCheckout=window.renderCheckout;
 renderHomeProductCards();
 syncFloatingCart();
 refreshPublicProducts();
+
+const originalGo=window.go;
+window.go=function(id){if(id==="checkout")document.querySelector(".order-success")?.remove();originalGo(id);if(id==="address"&&customerUser)window.cocoLoadAddresses();};
 </script>
 
 </body>
