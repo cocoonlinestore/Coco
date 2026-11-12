@@ -196,8 +196,20 @@ function saveSaved(key,value){try{localStorage.setItem(key,JSON.stringify(value)
 function go(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('.bottom button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));window.scrollTo({top:0,behavior:'smooth'});if(id==='cart')renderCart();if(id==='checkout')renderCheckout();if(id==='wishlist')renderWishlist();if(id==='address'&&window.cocoLoadAddresses)window.cocoLoadAddresses();if(id==='admin'&&window.cocoLoadSiteSettings)window.cocoLoadSiteSettings();}
 function syncFloatingCart(){const el=document.getElementById('floatingCartCount');if(el)el.textContent=String(typeof cartCount==='function'?cartCount():0);}
 function toast(message){const t=document.getElementById('toast');t.textContent=message;t.classList.add('show');clearTimeout(window.cocoTimer);window.cocoTimer=setTimeout(()=>t.classList.remove('show'),2400);}
-function openProduct(id='toothbrush'){currentProductId=id;qty=1;renderProduct();go('product');}
-function renderProduct(){const p=PRODUCTS[currentProductId];const thumbs=p.images.map((img,i)=>`<button class="thumb ${i===0?'active':''}" onclick="setGallery(${i})"><img src="${img}" alt="${p.name} image ${i+1}"></button>`).join('');const price=p.mrp?`<div class="price-line big"><strong>₹${p.price}</strong><del>₹${p.mrp}</del><span class="save-tag">Save ₹${p.mrp-p.price}</span></div>`:`<div class="price-line big"><strong>₹${p.price}</strong></div>`;const delivery=p.delivery===0?'Free delivery':`Delivery charge: ₹${p.delivery} · Total: <b>₹${p.price+p.delivery}</b>`;document.getElementById('productDetail').innerHTML=`
+function openProduct(id='toothbrush'){
+ const catalogue=window.PRODUCTS||{};
+ const p=catalogue[id];
+ if(!p){console.error('COCO product not found:',id,Object.keys(catalogue));toast('Product not found: '+id+'. Please refresh the store.');return;}
+ // Normalize optional Firestore fields before rendering the detail page.
+ p.images=Array.isArray(p.images)?p.images:(p.imageURL?[p.imageURL]:[]);
+ p.specs=Array.isArray(p.specs)?p.specs:[];
+ if(!Array.isArray(wishlistIds))wishlistIds=[];
+ currentProductId=id;qty=1;
+ try{renderProduct();go('product');}
+ catch(e){console.error('COCO product detail error:',e);toast('Could not open product: '+(e&&e.message?e.message:String(e)));}
+}
+window.openProduct=openProduct;
+function renderProduct(){const p=PRODUCTS[currentProductId];if(!p)throw new Error('Product not found: '+currentProductId);p.images=Array.isArray(p.images)?p.images:(p.imageURL?[p.imageURL]:[]);p.specs=Array.isArray(p.specs)?p.specs:[];if(!Array.isArray(wishlistIds))wishlistIds=[];const thumbs=p.images.map((img,i)=>`<button class="thumb ${i===0?'active':''}" onclick="setGallery(${i})"><img src="${img}" alt="${p.name} image ${i+1}"></button>`).join('');const price=p.mrp?`<div class="price-line big"><strong>₹${p.price}</strong><del>₹${p.mrp}</del><span class="save-tag">Save ₹${p.mrp-p.price}</span></div>`:`<div class="price-line big"><strong>₹${p.price}</strong></div>`;const delivery=p.delivery===0?'Free delivery':`Delivery charge: ₹${p.delivery} · Total: <b>₹${p.price+p.delivery}</b>`;document.getElementById('productDetail').innerHTML=`
  <div class="gallery"><div class="gallery-main"><img id="galleryMain" src="${p.images[0]}" alt="${p.name}"><span class="offer-badge">${escapeHtml(p.badge|| (p.delivery===0?'FREE DELIVERY':'LAUNCH OFFER'))}</span></div><div class="gallery-thumbs">${thumbs}</div></div>
  <div class="product-info-full"><span class="eyebrow">${escapeHtml(p.badge||'COCO STORE')}</span><h1>${p.name}</h1>${price}<p class="product-subline">${p.id==='denver'?'Five-piece travel-size deodorant gift pack.':'A simple upgrade to your everyday oral-care routine.'}</p><p class="delivery-note">${delivery}</p>
  <div class="detail-block"><b>Quantity</b><div class="qty-control"><button onclick="changeQty(-1)">−</button><span id="productQty">1</span><button onclick="changeQty(1)">+</button></div></div>
@@ -235,6 +247,15 @@ searchTop.addEventListener('focus',()=>go('search'));searchTop.addEventListener(
 document.querySelectorAll('.product-card').forEach((card,i)=>card.setAttribute('data-product',i===0?'toothbrush':'denver'));
 cartItems=loadSaved('cocoCart',{});
 renderWishlist();updateWishButtons();
+
+// Shared HTML escaping helper for the main store UI.
+// The Firebase module has its own private helper; expose this one to the classic script.
+window.escapeHtml = window.escapeHtml || function(v) {
+  return String(v ?? '').replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+};
+
 </script>
 
 <script type="module">
