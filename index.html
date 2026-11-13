@@ -245,7 +245,21 @@ function saveAddress(){const name=document.getElementById('addrName').value.trim
 function checkPin(){const pin=document.getElementById('productPin')?.value.trim();const msg=document.getElementById('pinMessage');if(msg)msg.textContent=/^\d{6}$/.test(pin||'')?'PIN code accepted. Estimated delivery: 3–7 business days, subject to courier serviceability.':'Please enter a valid 6-digit PIN code.';if(/^\d{6}$/.test(pin||'')){$('locationLabel').textContent=pin;const dp=$('productDeliveryPin');if(dp)dp.textContent=pin;}}
 window.checkDeliveryPin=()=>{const pin=$('deliveryPinCheck').value.trim();$('deliveryEstimate').textContent=/^\d{6}$/.test(pin)?'Estimated delivery: 3–7 business days. Final serviceability and date are confirmed by the delivery partner.':'Please enter a valid 6-digit PIN code.';if(/^\d{6}$/.test(pin)){$('addrPin').value=pin;$('locationLabel').textContent=pin;const dp=$('productDeliveryPin');if(dp)dp.textContent=pin;}};
 window.useCurrentLocation=()=>{if(!navigator.geolocation){toast('Location is not supported by this browser.');return;}toast('Requesting location permission…');navigator.geolocation.getCurrentPosition(async pos=>{try{const {latitude,longitude}=pos.coords;const url='https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+encodeURIComponent(latitude)+'&lon='+encodeURIComponent(longitude);const res=await fetch(url,{headers:{'Accept':'application/json'}});if(!res.ok)throw new Error('Address lookup unavailable');const data=await res.json(),a=data.address||{};const pin=a.postcode||'';const city=a.city||a.town||a.village||a.suburb||'';const district=a.state_district||a.county||a.district||'';const house=a.house_name||a.building||a.house_number||'';const landmark=a.amenity||a.shop||a.tourism||'';const line=[a.road,a.neighbourhood||a.suburb].filter(Boolean).join(', ');if(pin)$('addrPin').value=pin;if(city)$('addrCity').value=city;if(a.state)$('addrState').value=a.state;if(district)$('addrDistrict').value=district;if(house)$('addrHouse').value=house;if(landmark)$('addrLandmark').value=landmark;if(line)$('addrLine').value=line;if(pin){$('deliveryPinCheck').value=pin;$('locationLabel').textContent=pin;}toast(pin?'Current location address filled. Please review and save it.':'Location found. Please enter your PIN code and complete the address.');}catch(e){toast('Location found, but address lookup failed. Please enter your address manually.');}},err=>toast(err.code===1?'Location permission was denied.': 'Could not get your location. Enter your address manually.'),{enableHighAccuracy:true,timeout:12000,maximumAge:60000});};
-function shareProduct(){const p=PRODUCTS[currentProductId];if(navigator.share){navigator.share({title:p.name,text:`COCO: ${p.name} for ₹${p.price}`}).catch(()=>{});}else{toast('Sharing is not supported on this device.');}}
+async function shareProduct(){
+ const p=(window.PRODUCTS||PRODUCTS)[currentProductId];
+ if(!p){toast('Product not found.');return;}
+ const productUrl=new URL(window.location.href);
+ productUrl.searchParams.set('product',p.id||currentProductId);
+ productUrl.hash='';
+ const shareText=`COCO: ${p.name} for ₹${p.price}\nView product: ${productUrl.toString()}`;
+ if(navigator.share){
+  try{await navigator.share({title:`${p.name} | COCO`,text:shareText,url:productUrl.toString()});}
+  catch(e){if(e&&e.name!=='AbortError')console.warn('COCO share failed:',e);}
+ }else if(navigator.clipboard&&window.isSecureContext){
+  try{await navigator.clipboard.writeText(shareText);toast('Product link copied!');}
+  catch(e){console.warn('Clipboard copy failed:',e);toast('Could not copy link. Please use your browser share option.');}
+ }else{toast('Sharing is unavailable in this browser.');}
+}
 const searchTop=document.getElementById('searchTop');
 function renderSearch(q){const box=document.getElementById('searchResults');if(!q.trim()){box.innerHTML='<p class="search-hint">Start typing in the search bar above to discover COCO products.</p>';return;}const terms=q.toLowerCase().replace(/[^a-z0-9 ]/g,'').split(/\s+/).filter(Boolean);const matches=Object.values(PRODUCTS).filter(p=>terms.some(t=>(p.name+' '+p.specs.flat().join(' ')).toLowerCase().includes(t)||levenshtein(t,'toothbrush')<=2&&p.id==='toothbrush'));box.innerHTML=matches.length?matches.map(p=>`<div class="search-result" onclick="openProduct('${p.id}')"><img src="${p.images[0]}" alt=""><div><h3>${p.name}</h3><strong>₹${p.price}</strong><p class="muted">${p.delivery===0?'Free delivery':'Delivery ₹'+p.delivery}</p></div></div>`).join(''):'<p class="search-hint">No matching products yet. Try another search.</p>';}
 function levenshtein(a,b){const d=Array.from({length:a.length+1},(_,i)=>[i]);for(let j=1;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length];}
@@ -609,7 +623,10 @@ window.renderCheckout=window.renderCheckout;
 // Render the local launch catalogue immediately, then sync it from Firestore.
 renderHomeProductCards();
 syncFloatingCart();
-refreshPublicProducts();
+refreshPublicProducts().then(()=>{
+ const sharedProductId=new URLSearchParams(window.location.search).get('product');
+ if(sharedProductId && window.PRODUCTS && window.PRODUCTS[sharedProductId]) window.openProduct(sharedProductId);
+}).catch(e=>console.warn('Could not open shared COCO product:',e));
 
 const originalGo=window.go;
 window.go=function(id){if(id==="checkout")document.querySelector(".order-success")?.remove();originalGo(id);if(id==="address"&&customerUser)window.cocoLoadAddresses();};
